@@ -1,15 +1,25 @@
 var express = require("express");
 var app = express();
 var bodyParser = require("body-parser");
-var mongoose = require("mongoose");
 var axios = require("axios").default;
 const replaceAll = require("string.prototype.replaceall");
-var sleep = require("sleep");
+var mongoose = require("mongoose");
 
 var port = 8080;
+mongoose.connect("mongodb://localhost:27017/locationsDistance").then(() => {
+  console.log("MongoDB is connected");
+});
 
 app.get("/hello", (req, res) => {
   res.send();
+});
+
+app.get("/health", (req, res) => {
+  if (mongoose.connection.readyState == 1) {
+    res.status(200).send();
+  } else {
+    res.status(500).send("Error, DB is not connected");
+  }
 });
 
 app.get("/distance", (req, res) => {
@@ -33,15 +43,15 @@ app.get("/distance", (req, res) => {
     // console.log(location1Id);
     options = initOptions(dest);
     setTimeout(() => {
-      getCityId(options)
-        .then((data) => {
-          location2Id = data;
+      getCityId(options).then((data) => {
+        location2Id = data;
         //   console.log(location2Id);
-        })
-       setTimeout(() => {
-        getDistance(location1Id, location2Id).then((km)=>
-        res.send({"distance":km})); 
-       }, 2000);
+      });
+      setTimeout(() => {
+        getDistance(location1Id, location2Id).then((km) =>
+          res.send({ distance: km })
+        );
+      }, 2000);
     }, 2000);
   });
 });
