@@ -2,25 +2,32 @@ var express = require("express");
 var app = express();
 var bodyParser = require("body-parser");
 var axios = require("axios").default;
-const replaceAll = require("string.prototype.replaceall");
 var mongoose = require("mongoose");
+var LocationsDistance = require("./locationsDistance.model");
+const replaceAll = require("string.prototype.replaceall");
 
 var port = 8080;
 mongoose.connect("mongodb://localhost:27017/locationsDistance").then(() => {
   console.log("MongoDB is connected");
 });
 
+var db = mongoose.connection;
+
 app.get("/hello", (req, res) => {
   res.send();
 });
 
 app.get("/health", (req, res) => {
-  if (mongoose.connection.readyState == 1) {
+  if (db.readyState == 1) {
     res.status(200).send();
   } else {
     res.status(500).send("Error, DB is not connected");
   }
 });
+
+app.get("/popularsearch", (req, res) => {
+res.send(db.collection("locationdistances").find());
+})
 
 app.get("/distance", (req, res) => {
   var source = req.query.source;
@@ -48,17 +55,35 @@ app.get("/distance", (req, res) => {
         //   console.log(location2Id);
       });
       setTimeout(() => {
-        getDistance(location1Id, location2Id).then((km) =>
-          res.send({ distance: km })
-        );
+        getDistance(location1Id, location2Id).then((km) => {
+          updateLocation(location1Id, location2Id, km);
+          res.send({ distance: km });
+        });
       }, 2000);
     }, 2000);
   });
 });
 
-app.listen(port, () => {
-  console.log("app is listening on port: " + port);
-});
+function updateLocation(location1Id, location2Id, km) {
+  if (location1Id > location2Id) {
+    var temp = location1Id;
+    location1Id = location2Id;
+    location2Id = temp;
+  }
+  location1Id = JSON.stringify(location1Id);
+  location2Id = JSON.stringify(location2Id);
+
+  var tempId = location1Id + location2Id;
+
+  var query = {id:tempId},
+  update = { $inc: { hits: 1 } ,
+            $set: {distance: km},},
+  options = { upsert: true, new: true};
+  db.collection("locationdistances").findOneAndUpdate(query, update, options, function(error, result) {
+    if (error) {
+    console.log(error);}
+    });
+}
 
 function initOptions(location) {
   var option = {
@@ -97,3 +122,7 @@ function getDistance(location1, location2) {
     return response.data.data;
   });
 }
+
+app.listen(port, () => {
+  console.log("app is listening on port: " + port);
+});
