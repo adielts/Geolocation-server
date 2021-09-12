@@ -30,13 +30,13 @@ app.get("/distance", (req, res) => {
 
   getCityId(options).then((data) => {
     location1Id = data;
-    console.log(location1Id);
+    // console.log(location1Id);
     options = initOptions(dest);
     setTimeout(() => {
       getCityId(options)
         .then((data) => {
           location2Id = data;
-          console.log(location2Id);
+        //   console.log(location2Id);
         })
        setTimeout(() => {
         getDistance(location1Id, location2Id).then((km)=>
@@ -84,7 +84,6 @@ function getDistance(location1, location2) {
   };
 
   return axios.request(options).then((response) => {
-    console.log("KM:" + response.data.data);
     return response.data.data;
   });
 }
