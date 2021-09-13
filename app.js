@@ -1,12 +1,13 @@
 var express = require("express");
 var app = express();
-var bodyParser = require("body-parser");
 var axios = require("axios").default;
 var mongoose = require("mongoose");
 var LocationsDistance = require("./locationsDistance.model");
 const replaceAll = require("string.prototype.replaceall");
 
 var port = 8080;
+app.use(express.json());
+
 mongoose.connect("mongodb://localhost:27017/locationsDistance").then(() => {
   console.log("MongoDB is connected");
 });
@@ -26,8 +27,9 @@ app.get("/health", (req, res) => {
 });
 
 app.get("/popularsearch", (req, res) => {
-res.send(db.collection("locationdistances").find());
-})
+  // console.log(db.collection("locationdistances").find({}).limit(1).id);
+  res.send(db.collection("locationdistances").findOne({ hits }));
+});
 
 app.get("/distance", (req, res) => {
   var source = req.query.source;
@@ -35,8 +37,9 @@ app.get("/distance", (req, res) => {
 
   // Error handaling: illigal input
   if (source == undefined || dest == undefined) {
-    res.status(400);
-    res.send("Error, invalid location - missing one or more locations");
+    res
+      .status(400)
+      .send("Error, invalid location - missing one or more locations");
   }
 
   source = replaceAll(source, "-", " ");
@@ -64,8 +67,35 @@ app.get("/distance", (req, res) => {
   });
 });
 
+app.post("/distance", (req, res) => {
+  var source = req.body.source;
+  var destination = req.body.destination;
+  var distance = req.body.distance;
+  var sourceId, destId;
+
+  options = initOptions(source);
+  setTimeout(() => {
+    getCityId(options).then((data) => {
+      sourceId = data;
+      options = initOptions(destination);
+      setTimeout(() => {
+        getCityId(options).then((data) => {
+          destId = data;
+          updateLocation(sourceId, destId, distance);
+          res.status(201).send();
+        }, 2000);
+      });
+    }),
+      2000;
+  });
+});
+
 function updateLocation(location1Id, location2Id, km) {
-  if (location1Id > location2Id) {
+    if(location1 == undefined || location2 == undefined){
+        console.log("Error, location's ID not available")
+    }
+    
+    if (location1Id > location2Id) {
     var temp = location1Id;
     location1Id = location2Id;
     location2Id = temp;
@@ -75,14 +105,19 @@ function updateLocation(location1Id, location2Id, km) {
 
   var tempId = location1Id + location2Id;
 
-  var query = {id:tempId},
-  update = { $inc: { hits: 1 } ,
-            $set: {distance: km},},
-  options = { upsert: true, new: true};
-  db.collection("locationdistances").findOneAndUpdate(query, update, options, function(error, result) {
-    if (error) {
-    console.log(error);}
-    });
+  var query = { id: tempId },
+    update = { $inc: { hits: 1 }, $set: { distance: km } },
+    options = { upsert: true, new: true };
+  db.collection("locationdistances").findOneAndUpdate(
+    query,
+    update,
+    options,
+    (error, result) => {
+      if (error) {
+        console.log(error);
+      }
+    }
+  );
 }
 
 function initOptions(location) {
