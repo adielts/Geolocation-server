@@ -45,6 +45,7 @@ app.get("/distance", (req, res) => {
   source = replaceAll(source, "-", " ");
   dest = replaceAll(dest, "-", " ");
   var location2Id, location1Id;
+  var resSent = false;
 
   var options = initOptions(source);
 
@@ -56,12 +57,18 @@ app.get("/distance", (req, res) => {
       getCityId(options).then((data) => {
         location2Id = data;
         //   console.log(location2Id);
+        checkIfExistInLocalDB(location1Id, location2Id).then((data) => {
+          res.send({ distance: data.distance });
+          resSent = true;
+        });
       });
       setTimeout(() => {
-        getDistance(location1Id, location2Id).then((km) => {
-          updateLocation(location1Id, location2Id, km);
-          res.send({ distance: km });
-        });
+        if (!resSent) {
+          getDistance(location1Id, location2Id).then((km) => {
+            updateLocation(location1Id, location2Id, km);
+            res.send({ distance: km });
+          });
+        }
       }, 2000);
     }, 2000);
   });
@@ -90,12 +97,8 @@ app.post("/distance", (req, res) => {
   });
 });
 
-function updateLocation(location1Id, location2Id, km) {
-    if(location1 == undefined || location2 == undefined){
-        console.log("Error, location's ID not available")
-    }
-    
-    if (location1Id > location2Id) {
+function createID(location1Id, location2Id) {
+  if (location1Id > location2Id) {
     var temp = location1Id;
     location1Id = location2Id;
     location2Id = temp;
@@ -103,9 +106,25 @@ function updateLocation(location1Id, location2Id, km) {
   location1Id = JSON.stringify(location1Id);
   location2Id = JSON.stringify(location2Id);
 
-  var tempId = location1Id + location2Id;
+  return location1Id + location2Id;
+}
 
-  var query = { id: tempId },
+function checkIfExistInLocalDB(location1Id, location2Id) {
+  if (location1Id == undefined || location2Id == undefined) {
+    console.log("Error, location's ID not available");
+  }
+  var newId = createID(location1Id, location2Id);
+  return db.collection("locationdistances").findOne({ id: newId });
+}
+
+function updateLocation(location1Id, location2Id, km) {
+  if (location1Id == undefined || location2Id == undefined) {
+    console.log("Error, location's ID not available");
+  }
+
+  var newId = createID(location1Id, location2Id);
+
+  var query = { id: newId },
     update = { $inc: { hits: 1 }, $set: { distance: km } },
     options = { upsert: true, new: true };
   db.collection("locationdistances").findOneAndUpdate(
